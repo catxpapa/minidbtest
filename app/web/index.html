@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiniDB 测试应用</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗄️ MiniDB 测试应用</h1>
+            <p>懒猫官方 minidb 插件文档式数据库功能测试</p>
+        </header>
+
+        <div class="control-panel">
+            <button id="generateData" class="btn btn-primary">生成测试数据</button>
+            <button id="clearData" class="btn btn-danger">清理数据</button>
+            <button id="getAllData" class="btn btn-info">获取所有数据</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 查询功能测试</h2>
+            <div class="test-buttons">
+                <button id="testInQuery" class="btn btn-test">$in 查询测试</button>
+                <button id="testEqQuery" class="btn btn-test">$eq 查询测试</button>
+                <button id="testGtQuery" class="btn btn-test">$gt/$gte 查询测试</button>
+                <button id="testLtQuery" class="btn btn-test">$lt/$lte 查询测试</button>
+                <button id="testRangeQuery" class="btn btn-test">范围查询测试</button>
+                <button id="testExistsQuery" class="btn btn-test">$exists 查询测试</button>
+                <button id="testLikeQuery" class="btn btn-test">$like 查询测试</button>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h2>📊 测试结果</h2>
+            <div id="results" class="results-container">
+                <p class="placeholder">点击上方按钮开始测试...</p>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <h2>📈 状态信息</h2>
+            <div id="status" class="status-container">
+                <p>应用已就绪，等待操作...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 使用 Import Maps 配置模块路径 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@lazycatcloud/minidb": "https://cdn.skypack.dev/@lazycatcloud/minidb"
+        }
+    }
+    </script>
+
+    <script type="module">
+        // 按照官方文档正确导入 MiniDB [citation](1)
+        import { MiniDB } from "@lazycatcloud/minidb";
+
+        class MiniDBTester {
+            constructor() {
+                try {
+                    // 按照官方文档初始化 [citation](1)
+                    this.db = new MiniDB();
+                    this.testCollection = this.db.getCollection("minidb_test");
+                    this.initEventListeners();
+                    this.updateStatus('MiniDB 初始化成功，准备开始测试');
+                    console.log('MiniDB 初始化成功');
+                } catch (error) {
+                    console.error('MiniDB 初始化失败:', error);
+                    this.updateStatus(`初始化失败: ${error.message}`);
+                }
+            }
+
+            // 完全按照官方文档示例生成测试数据 [citation](1)
+            async generateTestData() {
+                console.log('开始生成测试数据...');
+                this.updateStatus('正在生成测试数据...');
+                
+                // 使用官方文档的确切代码格式 [citation](1)
+                const docs = [...Array(100)].map((_, index) => {
+                    const doc = {
+                        index,
+                        name: `name-${index}`,
+                    };
+                    if (index == 99) {
+                        doc.last = true;
+                    }
+                    return doc;
+                });
+                
+                try {
+                    await this.testCollection.upsert(docs);
+                    this.updateResults({
+                        success: true,
+                        message: '测试数据生成完成',
+                        count: docs.length,
+                        data: docs.slice(0, 5)
+                    });
+                    this.updateStatus('测试数据生成成功');
+                } catch (error) {
+                    console.error('生成测试数据失败:', error);
+                    this.updateResults({
+                        success: false,
+                        message: '生成测试数据失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $in 查询测试 - 按照官方文档 [citation](1)
+            async testInQuery() {
+                try {
+                    this.updateStatus('执行 $in 查询测试...');
+                    const result = await this.testCollection
+                        .find({ index: { $in: [0, 1, 2, 3, 4, 5] } }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$in 查询测试完成',
+                        query: '查询 index 在 [0,1,2,3,4,5] 范围内的数据',
+                        count: result.length,
+                        data: result
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$in 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $eq 查询测试 - 支持两种写法 [citation](1)
+            async testEqQuery() {
+                try {
+                    this.updateStatus('执行 $eq 查询测试...');
+                    // 官方文档支持的两种写法 [citation](1)
+                    const result1 = await this.testCollection.findOne({ index: 5 });
+                    const result2 = await this.testCollection.findOne({ index: { $eq: 5 } });
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$eq 查询测试完成',
+                        query: '查询 index 等于 5 的数据（两种写法）',
+                        data: { 
+                            简化写法: result1, 
+                            完整写法: result2 
+                        }
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$eq 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $gt 和 $gte 查询测试 [citation](1)
+            async testGtQuery() {
+                try {
+                    this.updateStatus('执行 $gt/$gte 查询测试...');
+                    const gtResult = await this.testCollection
+                        .find({ index: { $gt: 90 } }, { sort: ["index"] })
+                        .fetch();
+                        
+                    const gteResult = await this.testCollection
+                        .find({ index: { $gte: 90 } }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$gt 和 $gte 查询测试完成',
+                        details: {
+                            '$gt: 90': `${gtResult.length} 条记录（应为9条）`,
+                            '$gte: 90': `${gteResult.length} 条记录（应为10条）`
+                        },
+                        data: {
+                            gt_results: gtResult,
+                            gte_results: gteResult
+                        }
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$gt/$gte 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $lt 和 $lte 查询测试 [citation](1)
+            async testLtQuery() {
+                try {
+                    this.updateStatus('执行 $lt/$lte 查询测试...');
+                    const ltResult = await this.testCollection
+                        .find({ index: { $lt: 9 } }, { sort: ["index"] })
+                        .fetch();
+                        
+                    const lteResult = await this.testCollection
+                        .find({ index: { $lte: 9 } }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$lt 和 $lte 查询测试完成',
+                        details: {
+                            '$lt: 9': `${ltResult.length} 条记录（应为9条）`,
+                            '$lte: 9': `${lteResult.length} 条记录（应为10条）`
+                        },
+                        data: {
+                            lt_results: ltResult,
+                            lte_results: lteResult
+                        }
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$lt/$lte 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 范围查询测试 [citation](1)
+            async testRangeQuery() {
+                try {
+                    this.updateStatus('执行范围查询测试...');
+                    const result = await this.testCollection
+                        .find({ index: { $lte: 10, $gte: 5 } }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '范围查询测试完成',
+                        query: '查询 index 在 5-10 之间的数据',
+                        count: result.length,
+                        expected: '应为6条记录',
+                        data: result
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '范围查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $exists 查询测试 [citation](1)
+            async testExistsQuery() {
+                try {
+                    this.updateStatus('执行 $exists 查询测试...');
+                    const result = await this.testCollection
+                        .find({ $exists: "last" }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$exists 查询测试完成',
+                        query: '查询存在 last 字段的数据',
+                        count: result.length,
+                        expected: '应为1条记录（index=99）',
+                        data: result
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$exists 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // $like 查询测试 [citation](1)
+            async testLikeQuery() {
+                try {
+                    this.updateStatus('执行 $like 查询测试...');
+                    const simpleResult = await this.testCollection
+                        .find({ name: { $like: `name-1` } }, { sort: ["index"] })
+                        .fetch();
+                        
+                    const regexResult = await this.testCollection
+                        .find({ name: { $like: `name-1[5678]` } }, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '$like 查询测试完成',
+                        details: {
+                            '简单模糊查询 "name-1"': `${simpleResult.length} 条记录（应为11条）`,
+                            '正则表达式查询 "name-1[5678]"': `${regexResult.length} 条记录（应为4条）`
+                        },
+                        data: {
+                            simple_results: simpleResult.slice(0, 5),
+                            regex_results: regexResult
+                        }
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '$like 查询失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 获取所有数据
+            async getAllData() {
+                try {
+                    this.updateStatus('获取所有数据...');
+                    const result = await this.testCollection
+                        .find({}, { sort: ["index"] })
+                        .fetch();
+                    
+                    this.updateResults({
+                        success: true,
+                        message: '获取所有数据成功',
+                        count: result.length,
+                        data: result.slice(0, 10)
+                    });
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '获取数据失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 清理测试数据 [citation](1)
+            async clearData() {
+                try {
+                    this.updateStatus('清理测试数据...');
+                    await this.db.removeCollection("minidb_test");
+                    this.updateResults({
+                        success: true,
+                        message: '测试数据清理完成'
+                    });
+                    this.updateStatus('数据已清理');
+                } catch (error) {
+                    this.updateResults({
+                        success: false,
+                        message: '清理数据失败',
+                        error: error.message
+                    });
+                }
+            }
+
+            // 初始化事件监听器
+            initEventListeners() {
+                document.getElementById('generateData').addEventListener('click', () => this.generateTestData());
+                document.getElementById('clearData').addEventListener('click', () => this.clearData());
+                document.getElementById('getAllData').addEventListener('click', () => this.getAllData());
+                document.getElementById('testInQuery').addEventListener('click', () => this.testInQuery());
+                document.getElementById('testEqQuery').addEventListener('click', () => this.testEqQuery());
+                document.getElementById('testGtQuery').addEventListener('click', () => this.testGtQuery());
+                document.getElementById('testLtQuery').addEventListener('click', () => this.testLtQuery());
+                document.getElementById('testRangeQuery').addEventListener('click', () => this.testRangeQuery());
+                document.getElementById('testExistsQuery').addEventListener('click', () => this.testExistsQuery());
+                document.getElementById('testLikeQuery').addEventListener('click', () => this.testLikeQuery());
+            }
+
+            // 更新结果显示
+            updateResults(result) {
+                const resultsContainer = document.getElementById('results');
+                const resultItem = document.createElement('div');
+                resultItem.className = `result-item ${result.success ? '' : 'error'}`;
+                
+                let content = `<h3>${result.message}</h3>`;
+                if (result.query) content += `<p><strong>查询:</strong> ${result.query}</p>`;
+                if (result.count !== undefined) content += `<p><strong>结果数量:</strong> ${result.count}</p>`;
+                if (result.expected) content += `<p><strong>预期:</strong> ${result.expected}</p>`;
+                if (result.details) {
+                    content += '<p><strong>详细信息:</strong></p><ul>';
+                    Object.entries(result.details).forEach(([key, value]) => {
+                        content += `<li>${key}: ${value}</li>`;
+                    });
+                    content += '</ul>';
+                }
+                if (result.error) content += `<p><strong>错误:</strong> ${result.error}</p>`;
+                if (result.data) content += `<div class="data-preview">${JSON.stringify(result.data, null, 2)}</div>`;
+                
+                resultItem.innerHTML = content;
+                resultsContainer.appendChild(resultItem);
+                resultsContainer.scrollTop = resultsContainer.scrollHeight;
+            }
+
+            // 更新状态显示
+            updateStatus(message) {
+                const statusContainer = document.getElementById('status');
+                const timestamp = new Date().toLocaleTimeString();
+                statusContainer.innerHTML = `<p>[${timestamp}] ${message}</p>`;
+            }
+        }
+
+        // 等待DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            const tester = new MiniDBTester();
+            console.log('MiniDB 测试应用已初始化');
+        });
+    </script>
+</body>
+</html>
